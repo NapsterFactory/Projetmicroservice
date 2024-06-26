@@ -1,0 +1,203 @@
+  version: '3'
+
+  services:
+    mysqldb-product-service:
+      container_name: 'mysqldb-product-service'
+      image: mysql:5.7
+      ports:
+        - "3306:3306"
+      environment:
+        - MYSQL_ROOT_PASSWORD=1234
+        - MYSQL_DATABASE=productwebservice
+        - MYSQL_ROOT_HOST=%
+      healthcheck:
+        test: ["CMD","mysqladmin","ping","-h","localhost"]
+        timeout: 20s
+        retries: 10
+      restart: always
+      ulimits:
+        nofile:
+          soft: 65536
+          hard: 65536
+      networks:
+        - common-net
+        
+    mysqldb-order-service:
+      container_name: 'mysqldb-order-service'
+      image: mysql:5.7
+      ports:
+        - "3307:3306"
+      environment:
+        - MYSQL_ROOT_PASSWORD=1234
+        - MYSQL_DATABASE=orderdb
+        - MYSQL_ROOT_HOST=%
+      healthcheck:
+        test: ["CMD","mysqladmin","ping","-h","localhost"]
+        timeout: 20s
+        retries: 10
+      restart: always
+      ulimits:
+        nofile:
+          soft: 65536
+          hard: 65536
+      networks:
+        - common-net
+        
+    postgresql-fournisseur-service:
+      container_name: 'postgresql-fournisseur-service'
+      image: postgres
+      ports:
+        - "5432:5432"
+      environment:
+        POSTGRES_USER: aicha
+        POSTGRES_PASSWORD: password
+        POSTGRES_DB: Fournisseur_MS_DB
+      networks:
+        - common-net
+        
+    ## Eureka Server
+    discovery-server:
+      build: ./EurekaServer
+      container_name: discovery-server
+      ports:
+        - "8761:8761"
+      environment:
+        - SPRING_PROFILES_ACTIVE=docker
+      hostname: discovery-server
+      networks:
+        - common-net
+
+    ## Gate Way Server
+    api-gateway:
+      build: ./Gateway
+      container_name: api-gateway
+      ports:
+        - "8762:8762"
+      environment:
+        - SPRING_PROFILES_ACTIVE=docker
+        - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY= TRACE
+        - eureka.client.serviceUrl.defaultZone=http://discovery-server:8761/eureka
+        - app.eureka-server=discovery-server
+      depends_on:
+        - discovery-server
+      networks:
+        - common-net
+
+    product-service:
+      container_name: 'product-service'
+      build: ./ProductService
+      ports:
+        - "8081:8081"
+      links:
+        - "mysqldb-product-service"
+        - "discovery-server"
+      depends_on:
+        - mysqldb-product-service
+        - discovery-server
+        - api-gateway
+      restart: always
+      networks:
+        - common-net
+      environment:
+        - SPRING_PROFILES_ACTIVE=docker
+        - spring.datasource.url=jdbc:mysql://mysqldb-product-service:3306/productwebservice?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
+        - eureka.client.serviceUrl.defaultZone=http://discovery-server:8761/eureka
+        
+    facture-service:
+      container_name: 'facture-service'
+      build: ./FactureService
+      ports:
+        - "8083:8083"
+      links:
+        - "discovery-server"
+      depends_on:
+        - discovery-server
+        - api-gateway
+      restart: always
+      networks:
+        - common-net
+      environment:
+        - SPRING_PROFILES_ACTIVE=docker
+        - eureka.client.serviceUrl.defaultZone=http://discovery-server:8761/eureka
+    
+    order-service:
+      container_name: 'order-service'
+      build: ./ServiceOrder
+      ports:
+        - "8086:8086"
+      links:
+        - "mysqldb-order-service"
+        - "discovery-server"
+      depends_on:
+        - mysqldb-order-service
+        - discovery-server
+        - api-gateway
+      networks:
+        - common-net
+      environment:
+        - SPRING_PROFILES_ACTIVE=docker
+        - spring.datasource.url=jdbc:mysql://mysqldb-order-service:3307/orderdb?useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
+        - eureka.client.serviceUrl.defaultZone=http://discovery-server:8761/eureka
+        
+    fournisseur-service:
+      container_name: 'fournisseur-service'
+      build: ./FournisseurService
+      ports:
+        - "8089:8089"
+      links:
+        - "postgresql-fournisseur-service"
+        - "discovery-server"
+      depends_on:
+        - postgresql-fournisseur-service
+        - discovery-server
+        - api-gateway
+      restart: always
+      networks:
+        - common-net
+      environment:
+        - SPRING_PROFILES_ACTIVE=docker
+        - spring.datasource.url=jdbc:postgresql://postgresql-fournisseur-service:5432/Fournisseur_MS_DB
+        - eureka.client.serviceUrl.defaultZone=http://discovery-server:8761/eureka
+        
+    mongodb:
+      image: mongo:5.0.2
+      restart: unless-stopped
+      env_file: ./.env
+      environment:
+        - MONGO_INITDB_ROOT_USERNAME=
+        - MONGO_INITDB_ROOT_PASSWORD=
+      ports:
+        - 27017:27017
+      networks:
+        - common-net
+      
+    node-js-service:
+      container_name: 'node-js-service'
+      build: ./nodeJsService
+      ports:
+        - $NODE_LOCAL_PORT:$NODE_DOCKER_PORT
+      links:
+        - "mongodb"
+        - "discovery-server"
+      depends_on:
+        - mongodb
+        - discovery-server
+        - api-gateway
+      restart: always
+      networks:
+        - common-net
+      environment:
+        - DB_HOST=mongodb
+        - DB_USER=$MONGODB_USER
+        - DB_PASSWORD=$MONGODB_PASSWORD
+        - DB_NAME=$MONGODB_DATABASE
+        - DB_PORT=$MONGODB_DOCKER_PORT
+        - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=discovery-server
+      stdin_open: true
+      tty: true
+    
+
+
+  networks:
+    common-net: {}
+    
