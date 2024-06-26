@@ -15,8 +15,8 @@ public class DemoApplication {
     @Bean
     ApplicationRunner start(IOperateurRepository repo){
         return args -> {
-            Stream.of(new Operateur("Rihab","Idoudi","aa1234"),
-                    new Operateur("toto","titi","test2333"))
+            Stream.of(new Operateur("test1","test1","test1"),
+                    new Operateur("test2","test2","test2"))
                             .forEach(
                                     operateur -> {
                                         repo.save(operateur);

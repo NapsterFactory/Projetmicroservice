@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require("express");
 const blogRouter = require("./routes/BlogRoutes");
 const Eureka = require('eureka-js-client').Eureka ;
@@ -16,25 +17,22 @@ const {
   NODE_DOCKER_PORT
 } = process.env;
 
-mongoose.connect(`mongodb://${DB_HOST}:${DB_PORT}/${DB_NAME}`, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => {
-    console.log('Connected to the database');
-  })
-  .catch((error) => {
-    console.error('Error connecting to the database', error);
-  });
+mongoose.connect(`mongodb://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}`, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => {
+      console.log('Connected to the database');
+    })
+    .catch((error) => {
+      console.error('Error connecting to the database', error);
+    });
 
 app.use(express.json());
- 
-app.listen(3001, () => {
-  console.log(`Server is running on port 3001`);
+
+app.listen(NODE_DOCKER_PORT, () => {
+  console.log(`Server is running on port ${NODE_DOCKER_PORT}`);
 });
-// eurekaHelper.start((error)=>{if(error){console.log(error);}
-// console.log('Eureka client started')})
-eurekaHelper.registerWithEureka('nodejsMS', 3001);
+eurekaHelper.registerWithEureka('nodejsMS', NODE_DOCKER_PORT);
 
 module.exports = app;
 app.use(express.json());
 
 app.use('/api/blogs', blogRouter);
-

@@ -18,6 +18,7 @@ public class FactureRestController {
     @Autowired
     IFactureService factureService;
 
+
     @GetMapping("/")
     @ResponseBody
     public List<Facture> getFactures() {
